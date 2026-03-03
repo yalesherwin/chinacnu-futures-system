@@ -1,5 +1,3 @@
-import pandas as pd
-
 class RQClient:
     def __init__(self, username: str, password: str):
         try:
@@ -9,7 +7,7 @@ class RQClient:
         self.rq = rq
         self.rq.init(username, password)
 
-    def bars(self, symbol: str, count: int = 300, freq: str = '1m') -> pd.DataFrame:
+    def bars(self, symbol: str, count: int = 300, freq: str = '1m'):
         df = self.rq.get_price(symbol, frequency=freq, fields=['open','high','low','close','volume'], adjust_type='none', count=count)
         return df.reset_index()
 
