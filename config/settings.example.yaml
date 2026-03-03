@@ -1,0 +1,18 @@
+rqdata:
+  username: "your_rq_user"
+  password: "your_rq_password"
+
+symbols:
+  hotcoil: "HC888"
+  fuel_oil: "FU888"
+
+risk:
+  max_position_per_symbol: 3
+  max_daily_loss: 0.02
+  stop_loss_pct: 0.008
+  take_profit_pct: 0.012
+
+engine:
+  mode: "paper"   # paper/live
+  initial_cash: 1000000
+  fee_rate: 0.0002
