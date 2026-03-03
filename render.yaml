@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: chinacnu-futures-system
+    env: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: TRADING_API_ENABLED
+        value: "true"
+      - key: TRADING_API_BASE_URL
+        sync: false
+      - key: TRADING_API_TOKEN
+        sync: false
+      - key: TRADING_API_REALTIME_PATH
+        sync: false
+      - key: TRADING_API_KLINE_PATH
+        sync: false
+      - key: TRADING_API_ORDER_PATH
+        sync: false

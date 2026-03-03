@@ -5,12 +5,27 @@ import yaml
 from pathlib import Path
 from urllib import request, parse
 import json
+import os
 
 from data.rq_client import RQClient
 from strategies.hc_fu_trend import signal
 from engine.paper_executor import PaperExecutor
 
 cfg = yaml.safe_load(Path('config/settings.yaml').read_text()) if Path('config/settings.yaml').exists() else yaml.safe_load(Path('config/settings.example.yaml').read_text())
+
+# 环境变量覆盖（部署到 Render 时使用）
+if os.getenv('TRADING_API_BASE_URL'):
+    cfg.setdefault('trading_api', {})['base_url'] = os.getenv('TRADING_API_BASE_URL')
+if os.getenv('TRADING_API_TOKEN'):
+    cfg.setdefault('trading_api', {})['token'] = os.getenv('TRADING_API_TOKEN')
+if os.getenv('TRADING_API_REALTIME_PATH'):
+    cfg.setdefault('trading_api', {})['realtime_path'] = os.getenv('TRADING_API_REALTIME_PATH')
+if os.getenv('TRADING_API_KLINE_PATH'):
+    cfg.setdefault('trading_api', {})['kline_path'] = os.getenv('TRADING_API_KLINE_PATH')
+if os.getenv('TRADING_API_ORDER_PATH'):
+    cfg.setdefault('trading_api', {})['order_path'] = os.getenv('TRADING_API_ORDER_PATH')
+if os.getenv('TRADING_API_ENABLED'):
+    cfg.setdefault('trading_api', {})['enabled'] = os.getenv('TRADING_API_ENABLED').lower() in ('1', 'true', 'yes', 'on')
 
 rq_client = None
 executor = PaperExecutor(initial_cash=float(cfg['engine']['initial_cash']), fee_rate=float(cfg['engine']['fee_rate']))
