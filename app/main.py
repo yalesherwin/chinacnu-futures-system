@@ -29,6 +29,7 @@ if os.getenv('TRADING_API_ENABLED'):
     cfg.setdefault('trading_api', {})['enabled'] = os.getenv('TRADING_API_ENABLED').lower() in ('1', 'true', 'yes', 'on')
 
 rq_client = None
+rq_startup_error = None
 executor = PaperExecutor(initial_cash=float(cfg['engine']['initial_cash']), fee_rate=float(cfg['engine']['fee_rate']))
 
 app = FastAPI(title='chinacnu 期货自主交易系统', version='0.2.0')
@@ -99,11 +100,13 @@ def _http_post(url: str, payload: dict):
 
 @app.on_event('startup')
 def startup_event():
-    global rq_client
+    global rq_client, rq_startup_error
     try:
         rq_client = RQClient(cfg['rqdata']['username'], cfg['rqdata']['password'])
-    except Exception:
+        rq_startup_error = None
+    except Exception as e:
         rq_client = None
+        rq_startup_error = str(e)
 
 
 @app.get('/health')
@@ -115,6 +118,7 @@ def health():
         'trading_api_enabled': bool(tcfg.get('enabled', False)),
         'trading_api_base': tcfg.get('base_url', ''),
         'mode': 'external_api' if _use_external_api() else 'rqsdk',
+        'rq_startup_error': rq_startup_error,
     }
 
 
