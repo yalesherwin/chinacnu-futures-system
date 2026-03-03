@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib import request, parse
 import json
 import os
+from typing import Optional
 
 from data.rq_client import RQClient
 from strategies.hc_fu_trend import signal
@@ -47,7 +48,7 @@ class OrderReq(BaseModel):
     side: str  # BUY/SELL
     offset: str = 'OPEN'  # OPEN/CLOSE
     qty: int = 1
-    price: float | None = None
+    price: Optional[float] = None
 
 
 def _trading_cfg():
@@ -65,7 +66,7 @@ def _api_headers():
     return headers
 
 
-def _api_url(path: str, query: dict | None = None):
+def _api_url(path: str, query: Optional[dict] = None):
     base_url = _trading_cfg().get('base_url', '').rstrip('/')
     p = path if path.startswith('/') else '/' + path
     url = f'{base_url}{p}'
