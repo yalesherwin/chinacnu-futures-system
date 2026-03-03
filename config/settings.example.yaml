@@ -16,3 +16,16 @@ engine:
   mode: "paper"   # paper/live
   initial_cash: 1000000
   fee_rate: 0.0002
+
+trading_api:
+  enabled: false
+  base_url: "https://api.example.com"
+  token: "paste_your_token_here"
+  token_header: "Authorization"
+  token_prefix: "Bearer "
+  realtime_path: "/market/realtime"
+  kline_path: "/market/kline"
+  order_path: "/trade/order"
+  symbol_map:
+    HC: "HC"
+    FU: "FU"
