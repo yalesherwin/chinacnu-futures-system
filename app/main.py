@@ -75,6 +75,11 @@ def _api_url(path: str, query: Optional[dict] = None):
     return url
 
 
+def _use_external_api() -> bool:
+    tcfg = _trading_cfg()
+    return bool(tcfg.get('enabled', False) and str(tcfg.get('base_url', '')).strip())
+
+
 def _symbol_alias(symbol: str):
     m = _trading_cfg().get('symbol_map', {})
     return m.get(symbol, symbol)
@@ -109,6 +114,7 @@ def health():
         'rqdata_connected': rq_client is not None,
         'trading_api_enabled': bool(tcfg.get('enabled', False)),
         'trading_api_base': tcfg.get('base_url', ''),
+        'mode': 'external_api' if _use_external_api() else 'rqsdk',
     }
 
 
@@ -142,38 +148,49 @@ def run_signal(req: RunReq):
 @app.get('/api/market/realtime')
 def api_market_realtime(symbol: str = 'HC'):
     tcfg = _trading_cfg()
-    if not tcfg.get('enabled', False):
-        return {'ok': False, 'error': 'trading_api_disabled'}
+    if _use_external_api():
+        url = _api_url(tcfg.get('realtime_path', '/market/realtime'), {'symbol': _symbol_alias(symbol)})
+        try:
+            data = _http_get(url)
+            return {'ok': True, 'symbol': symbol, 'data': data, 'source': 'external_api'}
+        except Exception as e:
+            return {'ok': False, 'error': str(e), 'source': 'external_api'}
 
-    url = _api_url(tcfg.get('realtime_path', '/market/realtime'), {'symbol': _symbol_alias(symbol)})
+    if rq_client is None:
+        return {'ok': False, 'error': 'rqdata_not_connected'}
     try:
-        data = _http_get(url)
-        return {'ok': True, 'symbol': symbol, 'data': data}
+        data = rq_client.latest(_symbol_alias(symbol))
+        return {'ok': True, 'symbol': symbol, 'data': data, 'source': 'rqdatac'}
     except Exception as e:
-        return {'ok': False, 'error': str(e)}
+        return {'ok': False, 'error': str(e), 'source': 'rqdatac'}
 
 
 @app.get('/api/market/kline')
 def api_market_kline(symbol: str = 'HC', period: str = '1m', limit: int = 120):
     tcfg = _trading_cfg()
-    if not tcfg.get('enabled', False):
-        return {'ok': False, 'error': 'trading_api_disabled'}
+    if _use_external_api():
+        query = {'symbol': _symbol_alias(symbol), 'period': period, 'limit': limit}
+        url = _api_url(tcfg.get('kline_path', '/market/kline'), query)
+        try:
+            data = _http_get(url)
+            return {'ok': True, 'symbol': symbol, 'period': period, 'data': data, 'source': 'external_api'}
+        except Exception as e:
+            return {'ok': False, 'error': str(e), 'source': 'external_api'}
 
-    query = {'symbol': _symbol_alias(symbol), 'period': period, 'limit': limit}
-    url = _api_url(tcfg.get('kline_path', '/market/kline'), query)
+    if rq_client is None:
+        return {'ok': False, 'error': 'rqdata_not_connected'}
     try:
-        data = _http_get(url)
-        return {'ok': True, 'symbol': symbol, 'period': period, 'data': data}
+        bars = rq_client.bars(_symbol_alias(symbol), count=limit, freq=period)
+        if hasattr(bars, 'to_dict'):
+            bars = bars.to_dict('records')
+        return {'ok': True, 'symbol': symbol, 'period': period, 'data': {'bars': bars}, 'source': 'rqdatac'}
     except Exception as e:
-        return {'ok': False, 'error': str(e)}
+        return {'ok': False, 'error': str(e), 'source': 'rqdatac'}
 
 
 @app.post('/api/order')
 def api_order(req: OrderReq):
     tcfg = _trading_cfg()
-    if not tcfg.get('enabled', False):
-        return {'ok': False, 'error': 'trading_api_disabled'}
-
     payload = {
         'symbol': _symbol_alias(req.symbol),
         'side': req.side,
@@ -183,9 +200,21 @@ def api_order(req: OrderReq):
     if req.price is not None:
         payload['price'] = req.price
 
-    url = _api_url(tcfg.get('order_path', '/trade/order'))
+    if _use_external_api():
+        url = _api_url(tcfg.get('order_path', '/trade/order'))
+        try:
+            data = _http_post(url, payload)
+            return {'ok': True, 'request': payload, 'data': data, 'source': 'external_api'}
+        except Exception as e:
+            return {'ok': False, 'error': str(e), 'request': payload, 'source': 'external_api'}
+
+    # RQData 仅行情，不提供下单；这里回退到本地 paper executor
+    if rq_client is None:
+        return {'ok': False, 'error': 'rqdata_not_connected', 'request': payload, 'source': 'paper'}
     try:
-        data = _http_post(url, payload)
-        return {'ok': True, 'request': payload, 'data': data}
+        latest = rq_client.latest(payload['symbol'])
+        px = req.price if req.price is not None else float(latest.get('last') or 0)
+        trade = executor.order(req.symbol, req.side, req.qty, px)
+        return {'ok': True, 'request': payload, 'data': trade, 'source': 'paper'}
     except Exception as e:
-        return {'ok': False, 'error': str(e), 'request': payload}
+        return {'ok': False, 'error': str(e), 'request': payload, 'source': 'paper'}

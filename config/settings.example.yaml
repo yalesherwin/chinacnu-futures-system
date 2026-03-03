@@ -18,8 +18,8 @@ engine:
   fee_rate: 0.0002
 
 trading_api:
-  enabled: false
-  base_url: "https://api.example.com"
+  enabled: true
+  base_url: ""
   token: "paste_your_token_here"
   token_header: "Authorization"
   token_prefix: "Bearer "
@@ -27,5 +27,5 @@ trading_api:
   kline_path: "/market/kline"
   order_path: "/trade/order"
   symbol_map:
-    HC: "HC"
-    FU: "FU"
+    HC: "HC888"
+    FU: "FU888"
