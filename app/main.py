@@ -102,7 +102,9 @@ def _http_post(url: str, payload: dict):
 def startup_event():
     global rq_client, rq_startup_error
     try:
-        rq_client = RQClient(cfg['rqdata']['username'], cfg['rqdata']['password'])
+        rq_cfg = cfg.get('rqdata', {})
+        license_key = os.getenv('RQ_LICENSE_KEY') or os.getenv('RQSDK_LICENSE') or rq_cfg.get('license_key', '')
+        rq_client = RQClient(rq_cfg.get('username'), rq_cfg.get('password'), license_key=license_key)
         rq_startup_error = None
     except Exception as e:
         rq_client = None
