@@ -98,6 +98,39 @@ def _http_post(url: str, payload: dict):
         return json.loads(resp.read().decode('utf-8'))
 
 
+def _public_futures_latest(symbol: str):
+    """公共行情回退（无鉴权）: 东方财富期货列表。"""
+    try:
+        url = 'https://futsseapi.eastmoney.com/list/113?orderBy=3&sort=1&pageSize=500&pageIndex=0'
+        req = request.Request(url=url, headers={'User-Agent': 'Mozilla/5.0'}, method='GET')
+        with request.urlopen(req, timeout=12) as resp:
+            raw = json.loads(resp.read().decode('utf-8'))
+        rows = raw.get('list', []) if isinstance(raw, dict) else []
+        s = (symbol or '').strip().lower()
+        cand = [x for x in rows if str(x.get('dm', '')).lower().startswith(s)]
+        if not cand:
+            return None
+
+        # 优先主连（如 hcm/fum）
+        main = [x for x in cand if str(x.get('dm', '')).lower() == f'{s}m']
+        row = (main[0] if main else cand[0])
+        last = row.get('p')
+        if last in (None, '', '-'):  # 极端情况下回退昨结
+            last = row.get('rzjsj')
+        return {
+            'symbol': symbol,
+            'contract': row.get('dm'),
+            'last': float(last) if last not in (None, '', '-') else 0.0,
+            'open': float(row.get('o') or 0.0),
+            'high': float(row.get('h') or 0.0),
+            'low': float(row.get('l') or 0.0),
+            'volume': float(row.get('vol') or 0.0),
+            'provider': 'eastmoney_public',
+        }
+    except Exception:
+        return None
+
+
 @app.on_event('startup')
 def startup_event():
     global rq_client, rq_startup_error
@@ -163,11 +196,17 @@ def api_market_realtime(symbol: str = 'HC'):
             return {'ok': False, 'error': str(e), 'source': 'external_api'}
 
     if rq_client is None:
+        fb = _public_futures_latest(_symbol_alias(symbol))
+        if fb:
+            return {'ok': True, 'symbol': symbol, 'data': fb, 'source': 'public_fallback'}
         return {'ok': False, 'error': 'rqdata_not_connected'}
     try:
         data = rq_client.latest(_symbol_alias(symbol))
         return {'ok': True, 'symbol': symbol, 'data': data, 'source': 'rqdatac'}
     except Exception as e:
+        fb = _public_futures_latest(_symbol_alias(symbol))
+        if fb:
+            return {'ok': True, 'symbol': symbol, 'data': fb, 'source': 'public_fallback'}
         return {'ok': False, 'error': str(e), 'source': 'rqdatac'}
 
 
